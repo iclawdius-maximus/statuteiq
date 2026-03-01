@@ -9,7 +9,6 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY")!;
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -82,45 +81,11 @@ async function sectionLookup(
   return (data || []) as StatuteResult[];
 }
 
-async function semanticSearch(
-  supabase: ReturnType<typeof createClient>,
-  query: string,
-  stateCode: string
-): Promise<StatuteResult[]> {
-  // Generate embedding via OpenAI
-  const embeddingResponse = await fetch(
-    "https://api.openai.com/v1/embeddings",
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${OPENAI_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "text-embedding-3-small",
-        input: query,
-      }),
-    }
-  );
-
-  if (!embeddingResponse.ok) {
-    const err = await embeddingResponse.text();
-    throw new Error(`OpenAI embedding error: ${err}`);
-  }
-
-  const embeddingData = await embeddingResponse.json();
-  const embedding = embeddingData.data[0].embedding;
-
-  // Call the match_statutes RPC function
-  const { data, error } = await supabase.rpc("match_statutes", {
-    query_embedding: embedding,
-    match_count: 20,
-    filter_state: stateCode,
-  });
-
-  if (error) throw error;
-  return (data || []) as StatuteResult[];
-}
+// NOTE: Semantic/vector search requires a cloud-accessible embedding endpoint.
+// Ollama runs locally and cannot be reached from Supabase Edge Functions.
+// Until a cloud embedding endpoint (e.g. Ollama on a VPS, or another provider)
+// is wired in, semantic mode falls back to FTS keyword search.
+// Track: wire cloud embedding endpoint in a future update.
 
 serve(async (req) => {
   // Handle CORS preflight
@@ -158,27 +123,18 @@ serve(async (req) => {
       searchMode = isSectionPattern(query) ? "keyword" : "semantic";
     }
 
-    if (searchMode === "keyword" || isSectionPattern(query)) {
-      // Try section number direct lookup first
-      if (isSectionPattern(query)) {
-        results = await sectionLookup(supabase, query, state_code);
-      }
-      // Fall back to full-text search
+    // Semantic/auto modes fall back to FTS — Ollama runs locally and is not
+    // reachable from Supabase Edge Functions. Wire a cloud endpoint in a future update.
+    let usedMode = searchMode;
+    if (isSectionPattern(query)) {
+      results = await sectionLookup(supabase, query, state_code);
       if (results.length === 0) {
         results = await keywordSearch(supabase, query, state_code);
       }
+      usedMode = "keyword";
     } else {
-      // Semantic search; fall back to keyword if OpenAI key not set or fails
-      try {
-        if (OPENAI_API_KEY) {
-          results = await semanticSearch(supabase, query, state_code);
-        } else {
-          results = await keywordSearch(supabase, query, state_code);
-        }
-      } catch (err) {
-        console.error("Semantic search failed, falling back to keyword:", err);
-        results = await keywordSearch(supabase, query, state_code);
-      }
+      results = await keywordSearch(supabase, query, state_code);
+      usedMode = "fts";
     }
 
     return new Response(
@@ -186,6 +142,7 @@ serve(async (req) => {
         results,
         count: results.length,
         mode: searchMode,
+        search_mode: usedMode,
         query,
       }),
       {

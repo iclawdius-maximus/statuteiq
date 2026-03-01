@@ -1,35 +1,62 @@
 /**
- * Embedding Generator — generates OpenAI text-embedding-3-small embeddings
+ * Embedding Generator — generates Ollama nomic-embed-text embeddings (768 dims)
  * for all statutes where embedding IS NULL, then stores back to Supabase.
  *
  * Usage: npx tsx scripts/generate-embeddings.ts
  *
  * Prerequisites:
- *   - Supabase schema applied (001_initial_schema.sql)
+ *   - Ollama running locally: ollama serve
+ *   - nomic-embed-text model: ollama pull nomic-embed-text
+ *   - Supabase migration 003_ollama_embeddings.sql applied
  *   - Statutes ingested via ingest-ohio.ts
  *   - RLS disabled (002_disable_rls_dev.sql) or service_role key used
  */
 
-import OpenAI from "openai";
 import { createClient } from "@supabase/supabase-js";
+
+const OLLAMA_BASE_URL = "http://localhost:11434";
+const OLLAMA_MODEL = "nomic-embed-text";
+const BATCH_SIZE = 10;
+// Truncate to ~6000 chars to keep prompts reasonable
+const MAX_TEXT_LENGTH = 6000;
 
 const supabase = createClient(
   "https://nwfafhsbcwwhapbrwjys.supabase.co",
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im53ZmFmaHNiY3d3aGFwYnJ3anlzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMzE1NjgsImV4cCI6MjA4NzkwNzU2OH0.J7vBylNTrFb1ycQtXoI8s4sLqtpd3MHbp3XQFlyvDu8"
 );
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+async function checkOllama(): Promise<void> {
+  let res: Response;
+  try {
+    res = await fetch(`${OLLAMA_BASE_URL}/api/tags`);
+  } catch {
+    console.error("ERROR: Cannot reach Ollama at http://localhost:11434");
+    console.error("Start Ollama with: ollama serve");
+    process.exit(1);
+  }
 
-const BATCH_SIZE = 50;
-const EMBEDDING_MODEL = "text-embedding-3-small";
-// Max tokens for embedding model; truncate section_text to ~6000 chars to stay safe
-const MAX_TEXT_LENGTH = 6000;
+  if (!res.ok) {
+    console.error(`ERROR: Ollama returned HTTP ${res.status}`);
+    process.exit(1);
+  }
+
+  const data = (await res.json()) as { models: { name: string }[] };
+  const models = data.models || [];
+  const hasModel = models.some(
+    (m) => m.name === OLLAMA_MODEL || m.name.startsWith(`${OLLAMA_MODEL}:`)
+  );
+
+  if (!hasModel) {
+    console.error(`ERROR: Model '${OLLAMA_MODEL}' not found in Ollama.`);
+    console.error(`Run: ollama pull ${OLLAMA_MODEL}`);
+    process.exit(1);
+  }
+
+  console.log(`Ollama OK — model '${OLLAMA_MODEL}' is available.`);
+}
 
 function truncateText(text: string): string {
-  if (text.length <= MAX_TEXT_LENGTH) return text;
-  return text.slice(0, MAX_TEXT_LENGTH);
+  return text.length <= MAX_TEXT_LENGTH ? text : text.slice(0, MAX_TEXT_LENGTH);
 }
 
 function buildEmbeddingInput(statute: {
@@ -38,6 +65,22 @@ function buildEmbeddingInput(statute: {
   section_text: string;
 }): string {
   return `Section ${statute.section_num}: ${statute.section_title}\n\n${truncateText(statute.section_text)}`;
+}
+
+async function generateEmbedding(text: string): Promise<number[]> {
+  const res = await fetch(`${OLLAMA_BASE_URL}/api/embeddings`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ model: OLLAMA_MODEL, prompt: text }),
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Ollama embedding error (${res.status}): ${err}`);
+  }
+
+  const data = (await res.json()) as { embedding: number[] };
+  return data.embedding;
 }
 
 async function fetchBatch(offset: number, limit: number) {
@@ -61,18 +104,9 @@ async function countPending(): Promise<number> {
   return count || 0;
 }
 
-async function generateEmbeddings(texts: string[]): Promise<number[][]> {
-  const response = await openai.embeddings.create({
-    model: EMBEDDING_MODEL,
-    input: texts,
-  });
-  return response.data.map((item) => item.embedding);
-}
-
 async function updateEmbeddings(
   records: { id: string; embedding: number[] }[]
 ) {
-  // Supabase doesn't support bulk update easily; do individual updates
   const updates = records.map(({ id, embedding }) =>
     supabase.from("statutes").update({ embedding }).eq("id", id)
   );
@@ -83,15 +117,24 @@ async function updateEmbeddings(
 }
 
 async function main() {
-  console.log("=== StatuteIQ Embedding Generator ===");
-  console.log(`Model: ${EMBEDDING_MODEL}`);
+  console.log("=== StatuteIQ Embedding Generator (Ollama) ===");
+  console.log(`Model: ${OLLAMA_MODEL} (768 dims)`);
   console.log(`Started: ${new Date().toISOString()}\n`);
+
+  await checkOllama();
 
   let pending: number;
   try {
     pending = await countPending();
   } catch (err) {
     console.error("Failed to count pending statutes:", err);
+    console.error(
+      "\nIf you see a dimension mismatch or column error, apply the migration first:"
+    );
+    console.error(
+      "https://supabase.com/dashboard/project/nwfafhsbcwwhapbrwjys/sql/new"
+    );
+    console.error("File: supabase/migrations/003_ollama_embeddings.sql");
     process.exit(1);
   }
 
@@ -100,7 +143,7 @@ async function main() {
     process.exit(0);
   }
 
-  console.log(`Statutes needing embeddings: ${pending}`);
+  console.log(`\nStatutes needing embeddings: ${pending}`);
   console.log(`Batch size: ${BATCH_SIZE}\n`);
 
   let processed = 0;
@@ -125,48 +168,38 @@ async function main() {
 
     if (batch.length === 0) break;
 
-    const inputs = batch.map(buildEmbeddingInput);
-
-    let embeddings: number[][];
-    try {
-      embeddings = await generateEmbeddings(inputs);
-    } catch (err) {
-      console.error(
-        `Error generating embeddings for batch at offset ${offset}:`,
-        err
-      );
-      errors++;
-      offset += BATCH_SIZE;
-      continue;
+    const embeddings: number[][] = [];
+    for (const statute of batch) {
+      try {
+        const input = buildEmbeddingInput(statute);
+        const embedding = await generateEmbedding(input);
+        embeddings.push(embedding);
+      } catch (err) {
+        console.error(`Error generating embedding for ${statute.section_num}:`, err);
+        embeddings.push([]); // placeholder; filtered out below
+        errors++;
+      }
     }
 
-    const updates = batch.map((statute, i) => ({
-      id: statute.id,
-      embedding: embeddings[i],
-    }));
+    const updates = batch
+      .map((statute, i) => ({ id: statute.id, embedding: embeddings[i] }))
+      .filter((u) => u.embedding.length > 0);
 
-    try {
-      await updateEmbeddings(updates);
-      processed += batch.length;
-      const pct = pending > 0 ? ((processed / pending) * 100).toFixed(1) : "0";
-      console.log(
-        `Progress: ${processed}/${pending} (${pct}%) — batch of ${batch.length} at offset ${offset}`
-      );
-    } catch (err) {
-      console.error(
-        `Error storing embeddings for batch at offset ${offset}:`,
-        err
-      );
-      errors++;
+    if (updates.length > 0) {
+      try {
+        await updateEmbeddings(updates);
+        processed += updates.length;
+        const pct = pending > 0 ? ((processed / pending) * 100).toFixed(1) : "0";
+        console.log(
+          `Progress: ${processed}/${pending} (${pct}%) — batch of ${updates.length}`
+        );
+      } catch (err) {
+        console.error(`Error storing embeddings for batch at offset ${offset}:`, err);
+        errors++;
+      }
     }
 
-    // Don't advance offset — we re-query NULL embeddings, so processed ones
-    // won't show up again. But if there were errors storing, we'd loop forever.
-    // Advance anyway to avoid infinite loop on persistent errors.
     offset += BATCH_SIZE;
-
-    // Small delay to avoid rate limiting
-    await new Promise((r) => setTimeout(r, 200));
   }
 
   console.log(`\n=== Embedding Generation Complete ===`);
