@@ -2,6 +2,12 @@
  * ORC Scraper — Ohio Revised Code ingestion
  * Usage: npx tsx scripts/ingest-ohio.ts
  *
+ * Site structure: https://codes.ohio.gov/ohio-revised-code
+ *   Title index  → /ohio-revised-code
+ *   Title page   → /ohio-revised-code/title-1
+ *   Chapter page → /ohio-revised-code/chapter-101
+ *   Section page → /ohio-revised-code/section-101.01
+ *
  * NOTE ON RLS: If inserts fail with 403/permission errors, apply
  * supabase/migrations/002_disable_rls_dev.sql in the Supabase SQL Editor:
  * https://supabase.com/dashboard/project/nwfafhsbcwwhapbrwjys/sql/new
@@ -13,14 +19,30 @@ import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
   "https://nwfafhsbcwwhapbrwjys.supabase.co",
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im53ZmFmaHNiY3d3aGFwYnJ3anlzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMzE1NjgsImV4cCI6MjA4NzkwNzU2OH0.J7vBylNTrFb1ycQtXoI8s4sLqtpd3MHbp3XQFlyvDu8"
+  process.env.SUPABASE_ANON_KEY ||
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im53ZmFmaHNiY3d3aGFwYnJ3anlzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMzE1NjgsImV4cCI6MjA4NzkwNzU2OH0.J7vBylNTrFb1ycQtXoI8s4sLqtpd3MHbp3XQFlyvDu8"
 );
 
 const BASE_URL = "https://codes.ohio.gov";
-const DELAY_MS = 150;
+const ORC_INDEX = `${BASE_URL}/ohio-revised-code`;
+const DELAY_MS = 500;
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+const ORC_BASE = `${BASE_URL}/ohio-revised-code/`;
+
+/** Resolve a potentially-relative href.
+ *  - Hrefs that start with "ohio-revised-code/" are relative to the site root.
+ *  - Short slugs like "chapter-101" or "section-101.01" are relative to /ohio-revised-code/.
+ */
+function resolveUrl(href: string): string {
+  if (href.startsWith("http")) return href;
+  if (href.startsWith("/")) return `${BASE_URL}${href}`;
+  if (href.startsWith("ohio-revised-code/")) return `${BASE_URL}/${href}`;
+  // Short slug — resolve against /ohio-revised-code/
+  return `${ORC_BASE}${href}`;
 }
 
 async function fetchHtml(url: string): Promise<string> {
@@ -29,7 +51,8 @@ async function fetchHtml(url: string): Promise<string> {
       "User-Agent":
         "StatuteIQ/1.0 (legal research tool; contact iclawdius@heavenscapedevelopment.com)",
     },
-    timeout: 15000,
+    timeout: 20000,
+    maxRedirects: 5,
   });
   return response.data as string;
 }
@@ -54,54 +77,32 @@ interface SectionInfo {
 
 async function getTitles(): Promise<TitleInfo[]> {
   console.log("Fetching title index...");
-  const html = await fetchHtml(`${BASE_URL}/ohio-revised-code`);
+  const html = await fetchHtml(ORC_INDEX);
   const $ = cheerio.load(html);
   const titles: TitleInfo[] = [];
 
-  // Ohio ORC site: title links in the main content
   $("a").each((_, el) => {
     const href = $(el).attr("href") || "";
     const text = $(el).text().trim();
 
-    // Match patterns like /ohio-revised-code/title/1 or similar
-    const titleMatch = href.match(/\/ohio-revised-code\/title\/(\d+)/i);
+    // Match /ohio-revised-code/title-1 or ohio-revised-code/title-1
+    const titleMatch = href.match(/ohio-revised-code\/title-(\d+)/i);
     if (titleMatch) {
       const titleNumber = titleMatch[1];
-      const titleName = text.replace(/^Title\s+\d+\s*/i, "").trim() || text;
-      const url = href.startsWith("http") ? href : `${BASE_URL}${href}`;
+      const titleName = text.replace(/^Title\s+\d+\s*/i, "").replace(/^\|\s*/, "").trim() || text;
+      const url = resolveUrl(href);
       if (!titles.find((t) => t.titleNumber === titleNumber)) {
         titles.push({ titleNumber, titleName, url });
       }
     }
   });
 
-  // Fallback: look for numbered list items with title patterns
-  if (titles.length === 0) {
-    $("li a, td a, .title a").each((_, el) => {
-      const href = $(el).attr("href") || "";
-      const text = $(el).text().trim();
-      const match = text.match(/^Title\s+(\d+)\s*[–\-—]?\s*(.*)/i) ||
-                    href.match(/\/(\d+)$/);
-      if (match && href.includes("title")) {
-        const url = href.startsWith("http") ? href : `${BASE_URL}${href}`;
-        titles.push({
-          titleNumber: match[1],
-          titleName: match[2] || text,
-          url,
-        });
-      }
-    });
-  }
-
   console.log(`Found ${titles.length} titles`);
   return titles;
 }
 
-async function getChapters(
-  titleUrl: string,
-  titleNumber: string,
-  titleName: string
-): Promise<ChapterInfo[]> {
+async function getChapters(titleUrl: string): Promise<ChapterInfo[]> {
+  // titleUrl used for the fetch; chapter hrefs resolve flat under /ohio-revised-code/
   await sleep(DELAY_MS);
   const html = await fetchHtml(titleUrl);
   const $ = cheerio.load(html);
@@ -111,15 +112,13 @@ async function getChapters(
     const href = $(el).attr("href") || "";
     const text = $(el).text().trim();
 
-    // Match chapter links: /ohio-revised-code/chapter/1 or /1/ patterns
-    const chapterMatch =
-      href.match(/\/ohio-revised-code\/chapter\/(\d+[\w.-]*)/i) ||
-      href.match(/\/chapter\/(\d+[\w.-]*)/i);
+    // Match chapter-101 pattern (relative or absolute)
+    const chapterMatch = href.match(/chapter-(\d+[\w.-]*)/i);
     if (chapterMatch) {
       const chapterNum = chapterMatch[1];
       const chapterName =
         text.replace(/^Chapter\s+[\d.]+\s*/i, "").trim() || text;
-      const url = href.startsWith("http") ? href : `${BASE_URL}${href}`;
+      const url = resolveUrl(href);
       if (!chapters.find((c) => c.chapterNum === chapterNum)) {
         chapters.push({ chapterNum, chapterName, url });
       }
@@ -139,15 +138,12 @@ async function getSections(chapterUrl: string): Promise<SectionInfo[]> {
     const href = $(el).attr("href") || "";
     const text = $(el).text().trim();
 
-    // Match section links: /ohio-revised-code/section/1.01 patterns
-    const sectionMatch =
-      href.match(/\/ohio-revised-code\/section\/([\d.]+[\w-]*)/i) ||
-      href.match(/\/section\/([\d.]+[\w-]*)/i);
+    // Match section-101.01 pattern (relative or absolute)
+    const sectionMatch = href.match(/section-([\d]+\.[\d]+[\w.-]*)/i);
     if (sectionMatch) {
       const sectionNum = sectionMatch[1];
-      const sectionTitle =
-        text.replace(/^[\d.]+\s*/i, "").trim() || text;
-      const url = href.startsWith("http") ? href : `${BASE_URL}${href}`;
+      const sectionTitle = text.replace(/^[\d.]+\s*/i, "").trim() || "";
+      const url = resolveUrl(href);
       if (!sections.find((s) => s.sectionNum === sectionNum)) {
         sections.push({ sectionNum, sectionTitle, url });
       }
@@ -164,51 +160,59 @@ async function getSectionText(
   const html = await fetchHtml(sectionUrl);
   const $ = cheerio.load(html);
 
-  // Remove nav, header, footer, scripts
-  $("nav, header, footer, script, style, .nav, .navigation, .breadcrumb").remove();
-
-  // Try to find the main statute text container
   let text = "";
   let title = "";
   let lastUpdated: string | null = null;
 
-  // Common selectors for ORC pages
-  const contentSelectors = [
-    ".statute-text",
-    ".section-text",
-    "#statute-content",
-    ".content-body",
-    "article",
-    ".main-content",
-    "#main-content",
-    "main",
-  ];
+  // Extract section title from h1 (format: "Section 101.01 | Title of section.")
+  const h1Text = $("h1").first().text().trim();
+  const titleMatch = h1Text.match(/\|\s*(.+)$/);
+  if (titleMatch) {
+    title = titleMatch[1].replace(/\.$/, "").trim();
+  }
 
-  for (const sel of contentSelectors) {
-    if ($(sel).length > 0) {
-      text = $(sel).text().trim();
-      break;
+  // Extract statute text from .laws-body section
+  const lawsBody = $("section.laws-body");
+  if (lawsBody.length > 0) {
+    // Remove no-print elements (navigation, notices)
+    lawsBody.find(".no-print").remove();
+    // Get paragraph texts
+    const paragraphs: string[] = [];
+    lawsBody.find("p").each((_, el) => {
+      const pText = $(el).text().trim();
+      if (pText && pText.length > 5) {
+        paragraphs.push(pText);
+      }
+    });
+    text = paragraphs.join("\n\n");
+    // Fallback: full text of laws-body
+    if (!text) {
+      text = lawsBody.text().trim();
     }
   }
 
-  // Fallback: grab body text
+  // Fallback: try main content
   if (!text) {
-    text = $("body").text().trim();
+    $("nav, header, footer, script, style, .no-print, .section-banner").remove();
+    text = $("main").text().replace(/\s+/g, " ").trim();
   }
 
-  // Extract last updated date if present
-  const dateMatch = text.match(/Effective:\s*([\d/]+)/i) ||
-                    text.match(/Last amended:\s*([\w\s,]+\d{4})/i);
-  if (dateMatch) {
-    lastUpdated = dateMatch[1].trim();
+  // Extract last updated date
+  const lastUpdatedMatch = $(".laws-notice p").text().match(/Last updated (.+) at/i);
+  if (lastUpdatedMatch) {
+    lastUpdated = lastUpdatedMatch[1].trim();
   }
 
-  // Try to get h1/h2 as title
-  title = $("h1").first().text().trim() || $("h2").first().text().trim() || "";
+  // Also try effective date
+  if (!lastUpdated) {
+    const effectiveEl = $(".laws-section-info-module").first();
+    const dateText = effectiveEl.find(".value").text().trim();
+    if (dateText) {
+      lastUpdated = dateText;
+    }
+  }
 
-  // Clean text: remove excessive whitespace
   text = text.replace(/\s+/g, " ").trim();
-
   return { text, title, lastUpdated };
 }
 
@@ -270,15 +274,13 @@ async function main() {
   }
 
   if (titles.length === 0) {
-    console.warn("No titles found. The site structure may have changed.");
-    console.warn("Attempting direct URL patterns...");
-
-    // Fallback: try known Ohio ORC URL structure
-    for (let i = 1; i <= 58; i++) {
+    console.warn("No titles found. Falling back to known URL patterns...");
+    // Ohio ORC has titles 1–58 (odd numbers only up to ~58)
+    for (const n of [1,3,5,7,9,11,13,15,17,19,21,23,25,27,29,31,33,35,37,39,41,43,45,47,49,51,53,55,57]) {
       titles.push({
-        titleNumber: String(i),
-        titleName: `Title ${i}`,
-        url: `${BASE_URL}/ohio-revised-code/title/${i}`,
+        titleNumber: String(n),
+        titleName: `Title ${n}`,
+        url: `${BASE_URL}/ohio-revised-code/title-${n}`,
       });
     }
   }
@@ -288,7 +290,7 @@ async function main() {
 
     let chapters: ChapterInfo[] = [];
     try {
-      chapters = await getChapters(title.url, title.titleNumber, title.titleName);
+      chapters = await getChapters(title.url);
     } catch (err) {
       console.error(
         `  Error fetching chapters for Title ${title.titleNumber}:`,
