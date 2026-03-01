@@ -6,7 +6,9 @@
     "orientation": "portrait",
     "scheme": "statuteiq",
     "userInterfaceStyle": "automatic",
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.vorotech.statuteiq"
@@ -17,9 +19,24 @@
       },
       "package": "com.vorotech.statuteiq"
     },
-    "plugins": ["expo-router"],
+    "plugins": [
+      "expo-router"
+    ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "ec792e05-0abc-406c-8432-4bc8225c6cbc"
+      }
+    },
+    "owner": "iclawdius",
+    "runtimeVersion": {
+      "policy": "sdkVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/ec792e05-0abc-406c-8432-4bc8225c6cbc"
     }
   }
 }
