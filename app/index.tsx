@@ -23,14 +23,14 @@ export default function HomeScreen() {
 
         <View className="mb-6">
           <Text className="text-[13px] font-bold text-[#6B7280] uppercase tracking-widest mb-3">Quick Actions</Text>
-          <View className="flex-row gap-3">
+          <View className="flex-row gap-3 mb-3">
             <TouchableOpacity className="flex-1 bg-white rounded-xl p-4 items-center border border-[#E5E7EB] shadow-sm" onPress={() => router.push('/browse')}>
               <Text className="text-2xl mb-2">📚</Text>
               <Text className="text-xs font-semibold text-[#1B3A6B] text-center">Browse ORC</Text>
             </TouchableOpacity>
             <TouchableOpacity className="flex-1 bg-white rounded-xl p-4 items-center border border-[#E5E7EB] shadow-sm" onPress={() => router.push('/bookmarks')}>
               <Text className="text-2xl mb-2">🔖</Text>
-              <Text className="text-xs font-semibold text-[#1B3A6B] text-center">Bookmarks</Text>
+              <Text className="text-xs font-semibold text-[#1B3A6B] text-center">My Bookmarks</Text>
             </TouchableOpacity>
             <TouchableOpacity className="flex-1 bg-white rounded-xl p-4 items-center border border-[#E5E7EB] shadow-sm" onPress={() => router.push('/alerts')}>
               <Text className="text-2xl mb-2">🔔</Text>

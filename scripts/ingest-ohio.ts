@@ -25,7 +25,7 @@ const supabase = createClient(
 
 const BASE_URL = "https://codes.ohio.gov";
 const ORC_INDEX = `${BASE_URL}/ohio-revised-code`;
-const DELAY_MS = 500;
+const DELAY_MS = 1500;
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -45,16 +45,30 @@ function resolveUrl(href: string): string {
   return `${ORC_BASE}${href}`;
 }
 
-async function fetchHtml(url: string): Promise<string> {
-  const response = await axios.get(url, {
-    headers: {
-      "User-Agent":
-        "StatuteIQ/1.0 (legal research tool; contact iclawdius@heavenscapedevelopment.com)",
-    },
-    timeout: 20000,
-    maxRedirects: 5,
-  });
-  return response.data as string;
+async function fetchHtml(url: string, retries = 5): Promise<string> {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const response = await axios.get(url, {
+        headers: {
+          "User-Agent":
+            "StatuteIQ/1.0 (legal research tool; contact iclawdius@heavenscapedevelopment.com)",
+        },
+        timeout: 20000,
+        maxRedirects: 5,
+      });
+      return response.data as string;
+    } catch (err: any) {
+      const status = err?.response?.status;
+      if (status === 429 || status === 503) {
+        const wait = Math.min(DELAY_MS * Math.pow(3, attempt), 60000);
+        console.log(`    Rate limited (${status}), waiting ${wait}ms before retry ${attempt + 1}/${retries}...`);
+        await sleep(wait);
+      } else {
+        throw err;
+      }
+    }
+  }
+  throw new Error(`Failed to fetch ${url} after ${retries} retries`);
 }
 
 interface TitleInfo {

@@ -5,6 +5,26 @@ declare module 'uniwind' {
     export interface UniwindConfig {
         themes: readonly ['light', 'dark']
     }
+
+    // Components re-exported with className support (resolved by metro at runtime)
+    export {
+        View,
+        Text,
+        ScrollView,
+        TouchableOpacity,
+        FlatList,
+        TextInput,
+        Pressable,
+        Image,
+        Modal,
+        ActivityIndicator,
+        Switch,
+        TouchableHighlight,
+        TouchableNativeFeedback,
+        TouchableWithoutFeedback,
+        KeyboardAvoidingView,
+        SafeAreaView,
+    } from 'react-native';
 }
 
 export {}

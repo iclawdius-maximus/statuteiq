@@ -11,13 +11,14 @@ import {
 import { View, Text } from 'uniwind';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
-import { createClient } from '@supabase/supabase-js';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { supabase } from '../../lib/supabase';
+import { addBookmark, removeBookmark, isBookmarked } from '../../lib/bookmarks';
+import { checkUnlocked } from '../../lib/purchases';
+import PaywallModal from '../../components/PaywallModal';
 
-const SUPABASE_URL = 'https://nwfafhsbcwwhapbrwjys.supabase.co';
-const SUPABASE_ANON_KEY =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im53ZmFmaHNiY3d3aGFwYnJ3anlzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMzE1NjgsImV4cCI6MjA4NzkwNzU2OH0.J7vBylNTrFb1ycQtXoI8s4sLqtpd3MHbp3XQFlyvDu8';
-
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const VIEWS_KEY = 'statuteiq_free_views';
+const FREE_VIEW_LIMIT = 3;
 
 interface Statute {
   id: string;
@@ -41,19 +42,30 @@ function showToast(msg: string) {
 }
 
 function formatParagraphs(text: string): string[] {
-  // Split on double newlines or sentence-ending patterns followed by capital letters
   return text
     .split(/\n{2,}/)
     .map((p) => p.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim())
     .filter((p) => p.length > 0);
 }
 
+async function incrementViewCount(): Promise<number> {
+  const raw = await AsyncStorage.getItem(VIEWS_KEY);
+  const count = raw ? parseInt(raw, 10) : 0;
+  const next = count + 1;
+  await AsyncStorage.setItem(VIEWS_KEY, String(next));
+  return next;
+}
+
 export default function StatuteDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+
   const [statute, setStatute] = useState<Statute | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [bookmarked, setBookmarked] = useState(false);
+  const [bookmarkLoading, setBookmarkLoading] = useState(false);
+  const [showPaywall, setShowPaywall] = useState(false);
 
   useEffect(() => {
     if (!id) {
@@ -64,6 +76,16 @@ export default function StatuteDetailScreen() {
 
     (async () => {
       try {
+        // Check paywall
+        const unlocked = await checkUnlocked();
+        if (!unlocked) {
+          const views = await incrementViewCount();
+          if (views > FREE_VIEW_LIMIT) {
+            setShowPaywall(true);
+          }
+        }
+
+        // Load statute
         const { data, error } = await supabase
           .from('statutes')
           .select('*')
@@ -74,6 +96,9 @@ export default function StatuteDetailScreen() {
           setNotFound(true);
         } else {
           setStatute(data as Statute);
+          // Check bookmark state
+          const bm = await isBookmarked(id);
+          setBookmarked(bm);
         }
       } catch {
         setNotFound(true);
@@ -83,14 +108,34 @@ export default function StatuteDetailScreen() {
     })();
   }, [id]);
 
-  const handleBookmark = () => {
-    showToast('Bookmarks coming in Day 3');
+  const handleBookmark = async () => {
+    if (!id || bookmarkLoading) return;
+    setBookmarkLoading(true);
+    try {
+      if (bookmarked) {
+        await removeBookmark(id);
+        setBookmarked(false);
+        showToast('Bookmark removed');
+      } else {
+        await addBookmark(id);
+        setBookmarked(true);
+        showToast('Bookmarked!');
+      }
+    } finally {
+      setBookmarkLoading(false);
+    }
   };
 
   const handleCitation = () => {
     if (!statute) return;
     const citation = `Ohio Rev. Code § ${statute.section_num}`;
     Share.share({ message: citation, title: 'ORC Citation' });
+  };
+
+  const handleUnlock = async () => {
+    setShowPaywall(false);
+    // Reset view count
+    await AsyncStorage.setItem(VIEWS_KEY, '0');
   };
 
   if (loading) {
@@ -137,11 +182,21 @@ export default function StatuteDetailScreen() {
         options={{
           title: `ORC § ${statute.section_num}`,
           headerRight: () => (
-            <TouchableOpacity onPress={handleBookmark} style={{ marginRight: 4, padding: 8 }}>
-              <Text style={{ fontSize: 20 }}>{'🔖'}</Text>
+            <TouchableOpacity
+              onPress={handleBookmark}
+              disabled={bookmarkLoading}
+              style={{ marginRight: 4, padding: 8 }}
+            >
+              <Text style={{ fontSize: 20 }}>{bookmarked ? '🔖' : '🔖'}</Text>
             </TouchableOpacity>
           ),
         }}
+      />
+
+      <PaywallModal
+        visible={showPaywall}
+        onUnlock={handleUnlock}
+        onDismiss={() => setShowPaywall(false)}
       />
 
       <ScrollView
@@ -168,6 +223,11 @@ export default function StatuteDetailScreen() {
             {statute.last_updated ? (
               <View className="bg-white/20 rounded-full px-3 py-1">
                 <Text className="text-white text-xs">Updated {statute.last_updated}</Text>
+              </View>
+            ) : null}
+            {bookmarked ? (
+              <View className="bg-white/20 rounded-full px-3 py-1">
+                <Text className="text-white text-xs">🔖 Saved</Text>
               </View>
             ) : null}
           </View>
@@ -201,6 +261,16 @@ export default function StatuteDetailScreen() {
           >
             <Text className="text-xl mb-0.5">{'📋'}</Text>
             <Text className="text-xs text-[#6B7280]">Citation</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={handleBookmark}
+            disabled={bookmarkLoading}
+            className="items-center px-4"
+            activeOpacity={0.7}
+          >
+            <Text className="text-xl mb-0.5">{bookmarked ? '🔖' : '📌'}</Text>
+            <Text className="text-xs text-[#6B7280]">{bookmarked ? 'Saved' : 'Bookmark'}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
