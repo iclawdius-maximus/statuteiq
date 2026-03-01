@@ -1,0 +1,25 @@
+{
+  "expo": {
+    "name": "StatuteIQ",
+    "slug": "statuteiq",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "statuteiq",
+    "userInterfaceStyle": "automatic",
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.vorotech.statuteiq"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#1B3A6B"
+      },
+      "package": "com.vorotech.statuteiq"
+    },
+    "plugins": ["expo-router"],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
