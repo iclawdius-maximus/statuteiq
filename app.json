@@ -6,6 +6,12 @@
     "orientation": "portrait",
     "scheme": "statuteiq",
     "userInterfaceStyle": "automatic",
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "cover",
+      "backgroundColor": "#1B3A6B"
+    },
     "assetBundlePatterns": [
       "**/*"
     ],
