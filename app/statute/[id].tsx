@@ -17,6 +17,8 @@ import { supabase } from '../../lib/supabase';
 import { addBookmark, removeBookmark, isBookmarked } from '../../lib/bookmarks';
 import { checkUnlocked } from '../../lib/purchases';
 import PaywallModal from '../../components/PaywallModal';
+import CitationModal from '../../components/CitationModal';
+import ClientLetterModal from '../../components/ClientLetterModal';
 
 const VIEWS_KEY = 'statuteiq_free_views';
 const FREE_VIEW_LIMIT = 3;
@@ -67,6 +69,8 @@ export default function StatuteDetailScreen() {
   const [bookmarked, setBookmarked] = useState(false);
   const [bookmarkLoading, setBookmarkLoading] = useState(false);
   const [showPaywall, setShowPaywall] = useState(false);
+  const [showCitation, setShowCitation] = useState(false);
+  const [showLetter, setShowLetter] = useState(false);
 
   useEffect(() => {
     if (!id) {
@@ -129,8 +133,7 @@ export default function StatuteDetailScreen() {
 
   const handleCitation = () => {
     if (!statute) return;
-    const citation = `Ohio Rev. Code § ${statute.section_num}`;
-    Share.share({ message: citation, title: 'ORC Citation' });
+    setShowCitation(true);
   };
 
   const handleUnlock = async () => {
@@ -198,6 +201,18 @@ export default function StatuteDetailScreen() {
         visible={showPaywall}
         onUnlock={handleUnlock}
         onDismiss={() => setShowPaywall(false)}
+      />
+
+      <CitationModal
+        visible={showCitation}
+        onClose={() => setShowCitation(false)}
+        statute={statute ? { title: statute.section_title || statute.title_name, section: statute.section_num, text: statute.section_text } : null}
+      />
+
+      <ClientLetterModal
+        visible={showLetter}
+        onClose={() => setShowLetter(false)}
+        statute={statute ? { title: statute.section_title || statute.title_name, section: statute.section_num, text: statute.section_text } : null}
       />
 
       <ScrollView
@@ -275,7 +290,7 @@ export default function StatuteDetailScreen() {
           </TouchableOpacity>
 
           <TouchableOpacity
-            onPress={() => showToast('Compare coming in Day 4')}
+            onPress={() => showToast('Compare coming in Day 5')}
             className="items-center px-4"
             activeOpacity={0.7}
           >
@@ -284,7 +299,7 @@ export default function StatuteDetailScreen() {
           </TouchableOpacity>
 
           <TouchableOpacity
-            onPress={() => showToast('Letter drafting coming in Day 4')}
+            onPress={() => statute && setShowLetter(true)}
             className="items-center px-4"
             activeOpacity={0.7}
           >
