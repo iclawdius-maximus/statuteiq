@@ -1,15 +1,19 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Modal,
-  ScrollView,
   Share,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
+import {
+  BottomSheetBackdrop,
+  BottomSheetModal,
+  BottomSheetScrollView,
+  BottomSheetView,
+} from '@gorhom/bottom-sheet';
 import { generateClientLetter } from '../services/ai';
 
 interface Props {
@@ -25,11 +29,20 @@ interface Props {
 type Step = 'form' | 'loading' | 'result';
 
 export default function ClientLetterModal({ visible, onClose, statute }: Props) {
+  const ref = useRef<BottomSheetModal>(null);
   const [step, setStep] = useState<Step>('form');
   const [clientName, setClientName] = useState('');
   const [situation, setSituation] = useState('');
   const [letter, setLetter] = useState('');
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (visible) {
+      ref.current?.present();
+    } else {
+      ref.current?.dismiss();
+    }
+  }, [visible]);
 
   const reset = () => {
     setStep('form');
@@ -43,6 +56,16 @@ export default function ClientLetterModal({ visible, onClose, statute }: Props) 
     onClose();
     reset();
   };
+
+  const handleChange = useCallback(
+    (index: number) => {
+      if (index === -1) {
+        onClose();
+        reset();
+      }
+    },
+    [onClose]
+  );
 
   const handleGenerate = async () => {
     if (!statute || !clientName.trim()) return;
@@ -72,139 +95,170 @@ export default function ClientLetterModal({ visible, onClose, statute }: Props) 
     });
   };
 
+  const renderBackdrop = useCallback(
+    (props: React.ComponentProps<typeof BottomSheetBackdrop>) => (
+      <BottomSheetBackdrop {...props} disappearsOnIndex={-1} appearsOnIndex={0} />
+    ),
+    []
+  );
+
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={handleClose}>
-      <View className="flex-1 bg-black/60 justify-end">
-        <View className="bg-white rounded-t-3xl overflow-hidden" style={{ maxHeight: '90%' }}>
-          {/* Header */}
-          <View className="bg-[#1B3A6B] px-5 pt-6 pb-5">
-            <Text className="text-white text-xl font-bold">✉️ Draft Client Letter</Text>
-            <Text className="text-white/70 text-sm mt-1">
-              Plain-English explanation · Powered by Ollama
-            </Text>
-          </View>
+    <BottomSheetModal
+      ref={ref}
+      snapPoints={['70%', '92%']}
+      enablePanDownToClose
+      backdropComponent={renderBackdrop}
+      onChange={handleChange}
+      handleIndicatorStyle={{ backgroundColor: '#D1D5DB' }}
+    >
+      {/* Header */}
+      <View style={{ backgroundColor: '#1B3A6B', paddingHorizontal: 20, paddingTop: 24, paddingBottom: 20 }}>
+        <Text style={{ color: '#fff', fontSize: 20, fontWeight: 'bold' }}>✉️ Draft Client Letter</Text>
+        <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 14, marginTop: 4 }}>
+          Plain-English explanation · Powered by Ollama
+        </Text>
+      </View>
 
-          {/* STEP: Form */}
-          {step === 'form' && (
-            <ScrollView
-              contentContainerStyle={{ padding: 20 }}
-              keyboardShouldPersistTaps="handled"
-              showsVerticalScrollIndicator={false}
-            >
-              <Text className="text-[#374151] text-sm font-medium mb-1">
-                Client Name <Text className="text-red-500">*</Text>
-              </Text>
-              <TextInput
-                value={clientName}
-                onChangeText={setClientName}
-                placeholder="e.g. Jane Smith"
-                placeholderTextColor="#9CA3AF"
-                className="border border-[#D1D5DB] rounded-xl px-4 py-3 text-[#1A1A2E] text-base mb-5 bg-[#F9FAFB]"
-                autoCapitalize="words"
-              />
+      {/* STEP: Form */}
+      {step === 'form' && (
+        <BottomSheetScrollView
+          contentContainerStyle={{ padding: 20 }}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <Text style={{ color: '#374151', fontSize: 14, fontWeight: '500', marginBottom: 4 }}>
+            Client Name <Text style={{ color: '#EF4444' }}>*</Text>
+          </Text>
+          <TextInput
+            value={clientName}
+            onChangeText={setClientName}
+            placeholder="e.g. Jane Smith"
+            placeholderTextColor="#9CA3AF"
+            style={{
+              borderWidth: 1,
+              borderColor: '#D1D5DB',
+              borderRadius: 12,
+              paddingHorizontal: 16,
+              paddingVertical: 12,
+              color: '#1A1A2E',
+              fontSize: 16,
+              marginBottom: 20,
+              backgroundColor: '#F9FAFB',
+            }}
+            autoCapitalize="words"
+          />
 
-              <Text className="text-[#374151] text-sm font-medium mb-1">
-                Client Situation{' '}
-                <Text className="text-[#9CA3AF] font-normal">(optional)</Text>
-              </Text>
-              <TextInput
-                value={situation}
-                onChangeText={setSituation}
-                placeholder="e.g. My client is a landlord facing an eviction dispute…"
-                placeholderTextColor="#9CA3AF"
-                multiline
-                numberOfLines={4}
-                textAlignVertical="top"
-                className="border border-[#D1D5DB] rounded-xl px-4 py-3 text-[#1A1A2E] text-sm mb-5 bg-[#F9FAFB]"
-                style={{ minHeight: 96 }}
-              />
+          <Text style={{ color: '#374151', fontSize: 14, fontWeight: '500', marginBottom: 4 }}>
+            Client Situation{' '}
+            <Text style={{ color: '#9CA3AF', fontWeight: '400' }}>(optional)</Text>
+          </Text>
+          <TextInput
+            value={situation}
+            onChangeText={setSituation}
+            placeholder="e.g. My client is a landlord facing an eviction dispute…"
+            placeholderTextColor="#9CA3AF"
+            multiline
+            numberOfLines={4}
+            textAlignVertical="top"
+            style={{
+              borderWidth: 1,
+              borderColor: '#D1D5DB',
+              borderRadius: 12,
+              paddingHorizontal: 16,
+              paddingVertical: 12,
+              color: '#1A1A2E',
+              fontSize: 14,
+              marginBottom: 20,
+              backgroundColor: '#F9FAFB',
+              minHeight: 96,
+            }}
+          />
 
-              {error ? (
-                <View className="bg-red-50 border border-red-200 rounded-xl p-3 mb-4">
-                  <Text className="text-red-600 text-sm">{error}</Text>
-                </View>
-              ) : null}
+          {error ? (
+            <View style={{ backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: '#FECACA', borderRadius: 12, padding: 12, marginBottom: 16 }}>
+              <Text style={{ color: '#DC2626', fontSize: 14 }}>{error}</Text>
+            </View>
+          ) : null}
 
-              <TouchableOpacity
-                onPress={handleGenerate}
-                disabled={!clientName.trim()}
-                className="rounded-xl py-3.5 items-center mb-3"
-                style={{ backgroundColor: clientName.trim() ? '#1B3A6B' : '#9CA3AF' }}
-                activeOpacity={0.85}
-              >
-                <Text className="text-white font-semibold text-base">Generate Letter</Text>
-              </TouchableOpacity>
+          <TouchableOpacity
+            onPress={handleGenerate}
+            disabled={!clientName.trim()}
+            style={{
+              backgroundColor: clientName.trim() ? '#1B3A6B' : '#9CA3AF',
+              borderRadius: 12,
+              paddingVertical: 14,
+              alignItems: 'center',
+              marginBottom: 12,
+            }}
+            activeOpacity={0.85}
+          >
+            <Text style={{ color: '#fff', fontWeight: '600', fontSize: 16 }}>Generate Letter</Text>
+          </TouchableOpacity>
 
-              <TouchableOpacity
-                onPress={handleClose}
-                className="border border-[#E5E7EB] rounded-xl py-3.5 items-center"
-                activeOpacity={0.7}
-              >
-                <Text className="text-[#6B7280] font-medium">Cancel</Text>
-              </TouchableOpacity>
-            </ScrollView>
-          )}
+          <TouchableOpacity
+            onPress={handleClose}
+            style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, paddingVertical: 14, alignItems: 'center' }}
+            activeOpacity={0.7}
+          >
+            <Text style={{ color: '#6B7280', fontWeight: '500' }}>Cancel</Text>
+          </TouchableOpacity>
+        </BottomSheetScrollView>
+      )}
 
-          {/* STEP: Loading */}
-          {step === 'loading' && (
-            <View className="items-center py-16 px-6">
-              <ActivityIndicator size="large" color="#1B3A6B" />
-              <Text className="text-[#1A1A2E] text-base font-medium mt-4">Drafting letter…</Text>
-              <Text className="text-[#6B7280] text-sm mt-1 text-center">
-                Writing a plain-English explanation for {clientName}
+      {/* STEP: Loading */}
+      {step === 'loading' && (
+        <BottomSheetView style={{ alignItems: 'center', paddingVertical: 64, paddingHorizontal: 24 }}>
+          <ActivityIndicator size="large" color="#1B3A6B" />
+          <Text style={{ color: '#1A1A2E', fontSize: 16, fontWeight: '500', marginTop: 16 }}>Drafting letter…</Text>
+          <Text style={{ color: '#6B7280', fontSize: 14, marginTop: 4, textAlign: 'center' }}>
+            Writing a plain-English explanation for {clientName}
+          </Text>
+        </BottomSheetView>
+      )}
+
+      {/* STEP: Result */}
+      {step === 'result' && (
+        <>
+          <BottomSheetScrollView
+            contentContainerStyle={{ padding: 20 }}
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={{ backgroundColor: '#F9FAFB', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, padding: 16, marginBottom: 20 }}>
+              <Text style={{ color: '#1A1A2E', fontSize: 14, lineHeight: 22 }} selectable>
+                {letter}
               </Text>
             </View>
-          )}
+          </BottomSheetScrollView>
 
-          {/* STEP: Result */}
-          {step === 'result' && (
-            <>
-              <ScrollView
-                contentContainerStyle={{ padding: 20 }}
-                showsVerticalScrollIndicator={false}
-                style={{ flex: 1 }}
+          <BottomSheetView style={{ paddingHorizontal: 20, paddingBottom: 24, paddingTop: 8, borderTopWidth: 1, borderTopColor: '#E5E7EB', gap: 12 }}>
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              <TouchableOpacity
+                onPress={handleCopy}
+                style={{ flex: 1, borderWidth: 1, borderColor: '#1B3A6B', borderRadius: 12, paddingVertical: 14, alignItems: 'center' }}
+                activeOpacity={0.7}
               >
-                <View className="bg-[#F9FAFB] border border-[#E5E7EB] rounded-xl p-4 mb-5">
-                  <Text
-                    className="text-[#1A1A2E] text-sm leading-relaxed"
-                    selectable
-                  >
-                    {letter}
-                  </Text>
-                </View>
-              </ScrollView>
+                <Text style={{ color: '#1B3A6B', fontWeight: '600', fontSize: 14 }}>Copy</Text>
+              </TouchableOpacity>
 
-              <View className="px-5 pb-6 pt-2 border-t border-[#E5E7EB] gap-3">
-                <View className="flex-row gap-3">
-                  <TouchableOpacity
-                    onPress={handleCopy}
-                    className="flex-1 border border-[#1B3A6B] rounded-xl py-3.5 items-center"
-                    activeOpacity={0.7}
-                  >
-                    <Text className="text-[#1B3A6B] font-semibold text-sm">Copy</Text>
-                  </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleShare}
+                style={{ flex: 1, backgroundColor: '#1B3A6B', borderRadius: 12, paddingVertical: 14, alignItems: 'center' }}
+                activeOpacity={0.85}
+              >
+                <Text style={{ color: '#fff', fontWeight: '600', fontSize: 14 }}>Share</Text>
+              </TouchableOpacity>
+            </View>
 
-                  <TouchableOpacity
-                    onPress={handleShare}
-                    className="flex-1 bg-[#1B3A6B] rounded-xl py-3.5 items-center"
-                    activeOpacity={0.85}
-                  >
-                    <Text className="text-white font-semibold text-sm">Share</Text>
-                  </TouchableOpacity>
-                </View>
-
-                <TouchableOpacity
-                  onPress={() => setStep('form')}
-                  className="border border-[#E5E7EB] rounded-xl py-3 items-center"
-                  activeOpacity={0.7}
-                >
-                  <Text className="text-[#6B7280] text-sm font-medium">← Back to Form</Text>
-                </TouchableOpacity>
-              </View>
-            </>
-          )}
-        </View>
-      </View>
-    </Modal>
+            <TouchableOpacity
+              onPress={() => setStep('form')}
+              style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, paddingVertical: 12, alignItems: 'center' }}
+              activeOpacity={0.7}
+            >
+              <Text style={{ color: '#6B7280', fontSize: 14, fontWeight: '500' }}>← Back to Form</Text>
+            </TouchableOpacity>
+          </BottomSheetView>
+        </>
+      )}
+    </BottomSheetModal>
   );
 }

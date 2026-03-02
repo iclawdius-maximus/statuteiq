@@ -1,11 +1,6 @@
-import {
-  ActivityIndicator,
-  Modal,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native';
+import { BottomSheetBackdrop, BottomSheetModal, BottomSheetView } from '@gorhom/bottom-sheet';
 import { purchaseUnlock, restorePurchases } from '../lib/purchases';
 
 interface PaywallModalProps {
@@ -21,8 +16,24 @@ const FEATURES = [
 ];
 
 export default function PaywallModal({ visible, onUnlock, onDismiss }: PaywallModalProps) {
+  const ref = useRef<BottomSheetModal>(null);
   const [loading, setLoading] = useState(false);
   const [restoring, setRestoring] = useState(false);
+
+  useEffect(() => {
+    if (visible) {
+      ref.current?.present();
+    } else {
+      ref.current?.dismiss();
+    }
+  }, [visible]);
+
+  const handleChange = useCallback(
+    (index: number) => {
+      if (index === -1) onDismiss();
+    },
+    [onDismiss]
+  );
 
   const handlePurchase = async () => {
     setLoading(true);
@@ -44,70 +55,82 @@ export default function PaywallModal({ visible, onUnlock, onDismiss }: PaywallMo
     }
   };
 
+  const renderBackdrop = useCallback(
+    (props: React.ComponentProps<typeof BottomSheetBackdrop>) => (
+      <BottomSheetBackdrop {...props} disappearsOnIndex={-1} appearsOnIndex={0} />
+    ),
+    []
+  );
+
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onDismiss}>
-      <View className="flex-1 bg-black/60 items-center justify-center px-6">
-        <View className="bg-white rounded-2xl w-full overflow-hidden">
-          {/* Header */}
-          <View className="bg-[#1B3A6B] px-6 pt-8 pb-7 items-center">
-            <Text className="text-4xl mb-3">⚖️</Text>
-            <Text className="text-white text-2xl font-bold text-center">Unlock Full Access</Text>
-            <Text className="text-white/80 text-sm mt-1 text-center">
-              One-time purchase. No subscription.
-            </Text>
-          </View>
+    <BottomSheetModal
+      ref={ref}
+      snapPoints={['55%']}
+      enablePanDownToClose
+      backdropComponent={renderBackdrop}
+      onChange={handleChange}
+      handleIndicatorStyle={{ backgroundColor: '#D1D5DB' }}
+    >
+      <BottomSheetView>
+        {/* Header */}
+        <View style={{ backgroundColor: '#1B3A6B', paddingHorizontal: 24, paddingTop: 32, paddingBottom: 28, alignItems: 'center' }}>
+          <Text style={{ fontSize: 36, marginBottom: 12 }}>⚖️</Text>
+          <Text style={{ color: '#fff', fontSize: 24, fontWeight: 'bold', textAlign: 'center' }}>Unlock Full Access</Text>
+          <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 14, marginTop: 4, textAlign: 'center' }}>
+            One-time purchase. No subscription.
+          </Text>
+        </View>
 
-          {/* Price badge */}
-          <View className="items-center -mt-5">
-            <View className="bg-[#E8B84B] rounded-full px-6 py-2 shadow-sm">
-              <Text className="text-[#1B3A6B] text-xl font-extrabold">$9.99</Text>
-            </View>
-          </View>
-
-          {/* Features */}
-          <View className="px-6 pt-5 pb-4">
-            {FEATURES.map((f) => (
-              <View key={f.text} className="flex-row items-center mb-3">
-                <Text className="text-xl mr-3">{f.icon}</Text>
-                <Text className="text-[#1A1A2E] text-[15px] flex-1">{f.text}</Text>
-              </View>
-            ))}
-          </View>
-
-          {/* Buttons */}
-          <View className="px-6 pb-6 gap-3">
-            <TouchableOpacity
-              onPress={handlePurchase}
-              disabled={loading}
-              activeOpacity={0.85}
-              className="bg-[#1B3A6B] rounded-xl py-4 items-center"
-            >
-              {loading ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text className="text-white font-bold text-base">Unlock for $9.99</Text>
-              )}
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={handleRestore}
-              disabled={restoring}
-              activeOpacity={0.7}
-              className="border border-[#1B3A6B] rounded-xl py-3 items-center"
-            >
-              {restoring ? (
-                <ActivityIndicator color="#1B3A6B" />
-              ) : (
-                <Text className="text-[#1B3A6B] font-semibold text-sm">Restore Purchase</Text>
-              )}
-            </TouchableOpacity>
-
-            <TouchableOpacity onPress={onDismiss} activeOpacity={0.6} className="items-center py-2">
-              <Text className="text-[#9CA3AF] text-xs">Maybe Later</Text>
-            </TouchableOpacity>
+        {/* Price badge */}
+        <View style={{ alignItems: 'center', marginTop: -20 }}>
+          <View style={{ backgroundColor: '#E8B84B', borderRadius: 999, paddingHorizontal: 24, paddingVertical: 8 }}>
+            <Text style={{ color: '#1B3A6B', fontSize: 20, fontWeight: '800' }}>$9.99</Text>
           </View>
         </View>
-      </View>
-    </Modal>
+
+        {/* Features */}
+        <View style={{ paddingHorizontal: 24, paddingTop: 20, paddingBottom: 16 }}>
+          {FEATURES.map((f) => (
+            <View key={f.text} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+              <Text style={{ fontSize: 20, marginRight: 12 }}>{f.icon}</Text>
+              <Text style={{ color: '#1A1A2E', fontSize: 15, flex: 1 }}>{f.text}</Text>
+            </View>
+          ))}
+        </View>
+
+        {/* Buttons */}
+        <View style={{ paddingHorizontal: 24, paddingBottom: 24, gap: 12 }}>
+          <TouchableOpacity
+            onPress={handlePurchase}
+            disabled={loading}
+            activeOpacity={0.85}
+            style={{ backgroundColor: '#1B3A6B', borderRadius: 12, paddingVertical: 16, alignItems: 'center' }}
+          >
+            {loading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>Unlock for $9.99</Text>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={handleRestore}
+            disabled={restoring}
+            activeOpacity={0.7}
+            style={{ borderWidth: 1, borderColor: '#1B3A6B', borderRadius: 12, paddingVertical: 12, alignItems: 'center' }}
+          >
+            {restoring ? (
+              <ActivityIndicator color="#1B3A6B" />
+            ) : (
+              <Text style={{ color: '#1B3A6B', fontWeight: '600', fontSize: 14 }}>Restore Purchase</Text>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity onPress={onDismiss} activeOpacity={0.6} style={{ alignItems: 'center', paddingVertical: 8 }}>
+            <Text style={{ color: '#9CA3AF', fontSize: 12 }}>Maybe Later</Text>
+          </TouchableOpacity>
+        </View>
+      </BottomSheetView>
+    </BottomSheetModal>
   );
 }

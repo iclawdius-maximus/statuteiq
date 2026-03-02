@@ -1,13 +1,10 @@
-import { useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Modal,
-  ScrollView,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, Text, TouchableOpacity, View } from 'react-native';
+import BottomSheet, {
+  BottomSheetBackdrop,
+  BottomSheetModal,
+  BottomSheetScrollView,
+} from '@gorhom/bottom-sheet';
 import { generateCitation } from '../services/ai';
 
 interface Props {
@@ -21,10 +18,19 @@ interface Props {
 }
 
 export default function CitationModal({ visible, onClose, statute }: Props) {
+  const ref = useRef<BottomSheetModal>(null);
   const [loading, setLoading] = useState(false);
   const [citation, setCitation] = useState('');
   const [note, setNote] = useState('');
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (visible) {
+      ref.current?.present();
+    } else {
+      ref.current?.dismiss();
+    }
+  }, [visible]);
 
   useEffect(() => {
     if (!visible || !statute) return;
@@ -46,72 +52,89 @@ export default function CitationModal({ visible, onClose, statute }: Props) {
     Alert.alert('Copy Citation', citation, [{ text: 'OK' }]);
   };
 
+  const handleChange = useCallback(
+    (index: number) => {
+      if (index === -1) onClose();
+    },
+    [onClose]
+  );
+
+  const renderBackdrop = useCallback(
+    (props: React.ComponentProps<typeof BottomSheetBackdrop>) => (
+      <BottomSheetBackdrop {...props} disappearsOnIndex={-1} appearsOnIndex={0} />
+    ),
+    []
+  );
+
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View className="flex-1 bg-black/60 justify-end">
-        <View className="bg-white rounded-t-3xl overflow-hidden" style={{ maxHeight: '80%' }}>
-          {/* Header */}
-          <View className="bg-[#1B3A6B] px-5 pt-6 pb-5">
-            <Text className="text-white text-xl font-bold">📋 AI Citation Generator</Text>
-            <Text className="text-white/70 text-sm mt-1">Bluebook format · Powered by Ollama</Text>
+    <BottomSheetModal
+      ref={ref}
+      snapPoints={['60%', '85%']}
+      enablePanDownToClose
+      backdropComponent={renderBackdrop}
+      onChange={handleChange}
+      handleIndicatorStyle={{ backgroundColor: '#D1D5DB' }}
+    >
+      {/* Header */}
+      <View style={{ backgroundColor: '#1B3A6B', paddingHorizontal: 20, paddingTop: 24, paddingBottom: 20 }}>
+        <Text style={{ color: '#fff', fontSize: 20, fontWeight: 'bold' }}>📋 AI Citation Generator</Text>
+        <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 14, marginTop: 4 }}>
+          Bluebook format · Powered by Ollama
+        </Text>
+      </View>
+
+      <BottomSheetScrollView contentContainerStyle={{ padding: 20 }} showsVerticalScrollIndicator={false}>
+        {loading && (
+          <View style={{ alignItems: 'center', paddingVertical: 40 }}>
+            <ActivityIndicator size="large" color="#1B3A6B" />
+            <Text style={{ color: '#6B7280', fontSize: 14, marginTop: 12 }}>Generating citation…</Text>
           </View>
+        )}
 
-          <ScrollView contentContainerStyle={{ padding: 20 }} showsVerticalScrollIndicator={false}>
-            {loading && (
-              <View className="items-center py-10">
-                <ActivityIndicator size="large" color="#1B3A6B" />
-                <Text className="text-[#6B7280] text-sm mt-3">Generating citation…</Text>
+        {error ? (
+          <View style={{ backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: '#FECACA', borderRadius: 12, padding: 16 }}>
+            <Text style={{ color: '#DC2626', fontSize: 14 }}>{error}</Text>
+          </View>
+        ) : null}
+
+        {!loading && citation ? (
+          <>
+            <View style={{ backgroundColor: '#F0F4FF', borderWidth: 1, borderColor: '#C7D2FE', borderRadius: 12, padding: 16, marginBottom: 16 }}>
+              <Text style={{ fontSize: 12, color: '#6B7280', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>
+                Bluebook Citation
+              </Text>
+              <Text style={{ color: '#1A1A2E', fontSize: 16, fontWeight: '500', lineHeight: 24 }} selectable>
+                {citation}
+              </Text>
+            </View>
+
+            {note ? (
+              <View style={{ backgroundColor: '#FFFBEB', borderWidth: 1, borderColor: '#FDE68A', borderRadius: 12, padding: 16, marginBottom: 24 }}>
+                <Text style={{ fontSize: 12, color: '#92400E', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>
+                  Usage Note
+                </Text>
+                <Text style={{ color: '#78350F', fontSize: 14, lineHeight: 20 }}>{note}</Text>
               </View>
-            )}
-
-            {error ? (
-              <View className="bg-red-50 border border-red-200 rounded-xl p-4">
-                <Text className="text-red-600 text-sm">{error}</Text>
-              </View>
-            ) : null}
-
-            {!loading && citation ? (
-              <>
-                {/* Citation box */}
-                <View className="bg-[#F0F4FF] border border-[#C7D2FE] rounded-xl p-4 mb-4">
-                  <Text className="text-xs text-[#6B7280] uppercase tracking-wider mb-2">
-                    Bluebook Citation
-                  </Text>
-                  <Text className="text-[#1A1A2E] text-base font-medium leading-relaxed" selectable>
-                    {citation}
-                  </Text>
-                </View>
-
-                {/* Usage note */}
-                {note ? (
-                  <View className="bg-[#FFFBEB] border border-[#FDE68A] rounded-xl p-4 mb-6">
-                    <Text className="text-xs text-[#92400E] uppercase tracking-wider mb-2">
-                      Usage Note
-                    </Text>
-                    <Text className="text-[#78350F] text-sm leading-relaxed">{note}</Text>
-                  </View>
-                ) : null}
-
-                <TouchableOpacity
-                  onPress={handleCopy}
-                  className="bg-[#1B3A6B] rounded-xl py-3.5 items-center mb-3"
-                  activeOpacity={0.85}
-                >
-                  <Text className="text-white font-semibold text-base">Copy Citation</Text>
-                </TouchableOpacity>
-              </>
             ) : null}
 
             <TouchableOpacity
-              onPress={onClose}
-              className="border border-[#E5E7EB] rounded-xl py-3.5 items-center"
-              activeOpacity={0.7}
+              onPress={handleCopy}
+              style={{ backgroundColor: '#1B3A6B', borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginBottom: 12 }}
+              activeOpacity={0.85}
             >
-              <Text className="text-[#6B7280] font-medium">Close</Text>
+              <Text style={{ color: '#fff', fontWeight: '600', fontSize: 16 }}>Copy Citation</Text>
             </TouchableOpacity>
-          </ScrollView>
-        </View>
-      </View>
-    </Modal>
+          </>
+        ) : null}
+
+        <TouchableOpacity
+          onPress={onClose}
+          style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, paddingVertical: 14, alignItems: 'center' }}
+          activeOpacity={0.7}
+        >
+          <Text style={{ color: '#6B7280', fontWeight: '500' }}>Close</Text>
+        </TouchableOpacity>
+      </BottomSheetScrollView>
+    </BottomSheetModal>
   );
 }
