@@ -240,7 +240,8 @@ export default function StatuteDetailScreen() {
       />
 
       <ScrollView
-        contentContainerStyle={{ paddingBottom: 32 }}
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingBottom: 16 }}
         showsVerticalScrollIndicator={false}
       >
         {/* Section header */}
