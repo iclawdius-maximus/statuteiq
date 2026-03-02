@@ -205,7 +205,7 @@ export default function StatuteDetailScreen() {
   const paragraphs = formatParagraphs(statute.section_text);
 
   return (
-    <SafeAreaView className="flex-1 bg-[#F5F7FA]" edges={['top', 'left', 'right']}>
+    <View style={{ flex: 1, backgroundColor: '#F5F7FA' }}>
       <Stack.Screen
         options={{
           title: `ORC § ${statute.section_num}`,
@@ -280,7 +280,7 @@ export default function StatuteDetailScreen() {
         </View>
 
         {/* Statute text */}
-        <View className="px-5 pt-5">
+        <View style={{ paddingHorizontal: 20, paddingTop: 20 }}>
           {paragraphs.length > 0 ? (
             paragraphs.map((para, i) => (
               <Text
@@ -297,48 +297,55 @@ export default function StatuteDetailScreen() {
         </View>
       </ScrollView>
 
-      {/* Bottom action bar */}
-      <View className="border-t border-[#E5E7EB] bg-white px-4 pt-3" style={{ paddingBottom: insets.bottom + 8 }}>
-        <View className="flex-row justify-around">
+      {/* Bottom action bar — always pinned, clears home indicator */}
+      <View style={{
+        borderTopWidth: 1,
+        borderTopColor: '#E5E7EB',
+        backgroundColor: '#FFFFFF',
+        paddingHorizontal: 16,
+        paddingTop: 12,
+        paddingBottom: Math.max(insets.bottom, 12),
+      }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-around' }}>
           <TouchableOpacity
             onPress={handleCitation}
-            className="items-center px-4"
+            style={{ alignItems: 'center', paddingHorizontal: 16 }}
             activeOpacity={0.7}
           >
-            <Text className="text-xl mb-0.5">{'📋'}</Text>
-            <Text className="text-xs text-[#6B7280]">Citation</Text>
+            <Text style={{ fontSize: 20, marginBottom: 2 }}>{'📋'}</Text>
+            <Text style={{ fontSize: 12, color: '#6B7280' }}>Citation</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             onPress={handleBookmark}
             disabled={bookmarkLoading}
-            className="items-center px-4"
+            style={{ alignItems: 'center', paddingHorizontal: 16 }}
             activeOpacity={0.7}
           >
-            <Text className="text-xl mb-0.5">{bookmarked ? '🔖' : '📌'}</Text>
-            <Text className="text-xs text-[#6B7280]">{bookmarked ? 'Saved' : 'Bookmark'}</Text>
+            <Text style={{ fontSize: 20, marginBottom: 2 }}>{bookmarked ? '🔖' : '📌'}</Text>
+            <Text style={{ fontSize: 12, color: '#6B7280' }}>{bookmarked ? 'Saved' : 'Bookmark'}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             onPress={handleAlert}
             disabled={alertLoading}
-            className="items-center px-4"
+            style={{ alignItems: 'center', paddingHorizontal: 16 }}
             activeOpacity={0.7}
           >
-            <Text className="text-xl mb-0.5">{alerted ? '🔔' : '🔕'}</Text>
-            <Text className="text-xs text-[#6B7280]">{alerted ? 'Alert On' : 'Alert'}</Text>
+            <Text style={{ fontSize: 20, marginBottom: 2 }}>{alerted ? '🔔' : '🔕'}</Text>
+            <Text style={{ fontSize: 12, color: '#6B7280' }}>{alerted ? 'Alert On' : 'Alert'}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             onPress={() => statute && setShowLetter(true)}
-            className="items-center px-4"
+            style={{ alignItems: 'center', paddingHorizontal: 16 }}
             activeOpacity={0.7}
           >
-            <Text className="text-xl mb-0.5">{'✉️'}</Text>
-            <Text className="text-xs text-[#6B7280]">Letter</Text>
+            <Text style={{ fontSize: 20, marginBottom: 2 }}>{'✉️'}</Text>
+            <Text style={{ fontSize: 12, color: '#6B7280' }}>Letter</Text>
           </TouchableOpacity>
         </View>
       </View>
-    </SafeAreaView>
+    </View>
   );
 }
