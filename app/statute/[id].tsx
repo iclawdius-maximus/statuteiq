@@ -10,7 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../../lib/supabase';
@@ -63,6 +63,7 @@ async function incrementViewCount(): Promise<number> {
 export default function StatuteDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
 
   const [statute, setStatute] = useState<Statute | null>(null);
   const [loading, setLoading] = useState(true);
@@ -204,7 +205,7 @@ export default function StatuteDetailScreen() {
   const paragraphs = formatParagraphs(statute.section_text);
 
   return (
-    <SafeAreaView className="flex-1 bg-[#F5F7FA]">
+    <SafeAreaView className="flex-1 bg-[#F5F7FA]" edges={['top', 'left', 'right']}>
       <Stack.Screen
         options={{
           title: `ORC § ${statute.section_num}`,
@@ -296,7 +297,7 @@ export default function StatuteDetailScreen() {
       </ScrollView>
 
       {/* Bottom action bar */}
-      <View className="border-t border-[#E5E7EB] bg-white px-4 py-3">
+      <View className="border-t border-[#E5E7EB] bg-white px-4 pt-3" style={{ paddingBottom: insets.bottom + 8 }}>
         <View className="flex-row justify-around">
           <TouchableOpacity
             onPress={handleCitation}
