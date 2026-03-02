@@ -15,6 +15,7 @@ import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../../lib/supabase';
 import { addBookmark, removeBookmark, isBookmarked } from '../../lib/bookmarks';
+import { addAlert, removeAlert, isAlerted } from '../../lib/alerts';
 import { checkUnlocked } from '../../lib/purchases';
 import PaywallModal from '../../components/PaywallModal';
 import CitationModal from '../../components/CitationModal';
@@ -68,6 +69,8 @@ export default function StatuteDetailScreen() {
   const [notFound, setNotFound] = useState(false);
   const [bookmarked, setBookmarked] = useState(false);
   const [bookmarkLoading, setBookmarkLoading] = useState(false);
+  const [alerted, setAlerted] = useState(false);
+  const [alertLoading, setAlertLoading] = useState(false);
   const [showPaywall, setShowPaywall] = useState(false);
   const [showCitation, setShowCitation] = useState(false);
   const [showLetter, setShowLetter] = useState(false);
@@ -101,9 +104,11 @@ export default function StatuteDetailScreen() {
           setNotFound(true);
         } else {
           setStatute(data as Statute);
-          // Check bookmark state
+          // Check bookmark + alert state
           const bm = await isBookmarked(id);
           setBookmarked(bm);
+          const al = await isAlerted(id);
+          setAlerted(al);
         }
       } catch {
         setNotFound(true);
@@ -128,6 +133,24 @@ export default function StatuteDetailScreen() {
       }
     } finally {
       setBookmarkLoading(false);
+    }
+  };
+
+  const handleAlert = async () => {
+    if (!id || alertLoading) return;
+    setAlertLoading(true);
+    try {
+      if (alerted) {
+        await removeAlert(id);
+        setAlerted(false);
+        showToast('Alert removed');
+      } else {
+        await addAlert(id);
+        setAlerted(true);
+        Alert.alert('Alert set!', "You'll be notified if this statute changes.");
+      }
+    } finally {
+      setAlertLoading(false);
     }
   };
 
@@ -246,6 +269,11 @@ export default function StatuteDetailScreen() {
                 <Text className="text-white text-xs">🔖 Saved</Text>
               </View>
             ) : null}
+            {alerted ? (
+              <View className="bg-white/20 rounded-full px-3 py-1">
+                <Text className="text-white text-xs">🔔 Alert On</Text>
+              </View>
+            ) : null}
           </View>
         </View>
 
@@ -290,12 +318,13 @@ export default function StatuteDetailScreen() {
           </TouchableOpacity>
 
           <TouchableOpacity
-            onPress={() => showToast('Compare coming in Day 5')}
+            onPress={handleAlert}
+            disabled={alertLoading}
             className="items-center px-4"
             activeOpacity={0.7}
           >
-            <Text className="text-xl mb-0.5">{'🗺️'}</Text>
-            <Text className="text-xs text-[#6B7280]">Compare</Text>
+            <Text className="text-xl mb-0.5">{alerted ? '🔔' : '🔕'}</Text>
+            <Text className="text-xs text-[#6B7280]">{alerted ? 'Alert On' : 'Alert'}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
