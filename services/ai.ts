@@ -10,6 +10,7 @@ export async function generateCitation(statute: {
 }): Promise<{ citation: string; note: string }> {
   const response = await openai.chat.completions.create({
     model: MODEL,
+    response_format: { type: 'json_object' },
     messages: [
       { role: 'system', content: 'You are a legal citation expert.' },
       {
@@ -19,10 +20,16 @@ export async function generateCitation(statute: {
     ],
   });
 
-  const content = response.choices[0].message.content ?? '{}';
-  const jsonMatch = content.match(/\{[\s\S]*\}/);
-  const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : content);
-  return { citation: parsed.citation ?? '', note: parsed.note ?? '' };
+  const raw = response.choices[0].message.content ?? '{}';
+  // Strip markdown code fences if present
+  const stripped = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+  const jsonMatch = stripped.match(/\{[\s\S]*\}/);
+  try {
+    const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : stripped);
+    return { citation: parsed.citation ?? '', note: parsed.note ?? '' };
+  } catch {
+    return { citation: raw.trim(), note: '' };
+  }
 }
 
 export async function generateClientLetter(
@@ -49,5 +56,9 @@ export async function generateClientLetter(
     ],
   });
 
-  return response.choices[0].message.content ?? '';
+  const content = response.choices[0].message.content ?? '';
+  if (content.trim().length < 50) {
+    throw new Error('Model returned an empty response');
+  }
+  return content;
 }

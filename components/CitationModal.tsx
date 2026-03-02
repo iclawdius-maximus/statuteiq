@@ -53,7 +53,7 @@ export default function CitationModal({ visible, onClose, statute }: Props) {
           {/* Header */}
           <View className="bg-[#1B3A6B] px-5 pt-6 pb-5">
             <Text className="text-white text-xl font-bold">📋 AI Citation Generator</Text>
-            <Text className="text-white/70 text-sm mt-1">Bluebook format · gpt-4o-mini</Text>
+            <Text className="text-white/70 text-sm mt-1">Bluebook format · Powered by Ollama</Text>
           </View>
 
           <ScrollView contentContainerStyle={{ padding: 20 }} showsVerticalScrollIndicator={false}>

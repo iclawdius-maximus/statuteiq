@@ -80,7 +80,7 @@ export default function ClientLetterModal({ visible, onClose, statute }: Props) 
           <View className="bg-[#1B3A6B] px-5 pt-6 pb-5">
             <Text className="text-white text-xl font-bold">✉️ Draft Client Letter</Text>
             <Text className="text-white/70 text-sm mt-1">
-              Plain-English explanation · gpt-4o-mini
+              Plain-English explanation · Powered by Ollama
             </Text>
           </View>
 
