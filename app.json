@@ -25,6 +25,12 @@
       },
       "package": "com.vorotech.statuteiq"
     },
+    "platforms": ["ios", "android", "web"],
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/icon.png"
+    },
     "plugins": [
       "expo-router"
     ],

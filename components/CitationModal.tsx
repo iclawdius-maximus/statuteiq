@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Modal, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import BottomSheet, {
   BottomSheetBackdrop,
   BottomSheetModal,
@@ -25,10 +25,12 @@ export default function CitationModal({ visible, onClose, statute }: Props) {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (visible) {
-      ref.current?.present();
-    } else {
-      ref.current?.dismiss();
+    if (Platform.OS !== 'web') {
+      if (visible) {
+        ref.current?.present();
+      } else {
+        ref.current?.dismiss();
+      }
     }
   }, [visible]);
 
@@ -66,24 +68,17 @@ export default function CitationModal({ visible, onClose, statute }: Props) {
     []
   );
 
-  return (
-    <BottomSheetModal
-      ref={ref}
-      snapPoints={['60%', '85%']}
-      enablePanDownToClose
-      backdropComponent={renderBackdrop}
-      onChange={handleChange}
-      handleIndicatorStyle={{ backgroundColor: '#D1D5DB' }}
-    >
+  const content = (
+    <>
       {/* Header */}
       <View style={{ backgroundColor: '#1B3A6B', paddingHorizontal: 20, paddingTop: 24, paddingBottom: 20 }}>
         <Text style={{ color: '#fff', fontSize: 20, fontWeight: 'bold' }}>📋 AI Citation Generator</Text>
         <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 14, marginTop: 4 }}>
-          Bluebook format · Powered by Ollama
+          Bluebook format · Powered by Groq
         </Text>
       </View>
 
-      <BottomSheetScrollView contentContainerStyle={{ padding: 20 }} showsVerticalScrollIndicator={false}>
+      <View style={{ padding: 20 }}>
         {loading && (
           <View style={{ alignItems: 'center', paddingVertical: 40 }}>
             <ActivityIndicator size="large" color="#1B3A6B" />
@@ -134,7 +129,51 @@ export default function CitationModal({ visible, onClose, statute }: Props) {
         >
           <Text style={{ color: '#6B7280', fontWeight: '500' }}>Close</Text>
         </TouchableOpacity>
+      </View>
+    </>
+  );
+
+  if (Platform.OS === 'web') {
+    return (
+      <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+        <View style={styles.webOverlay}>
+          <View style={styles.webCard}>
+            {content}
+          </View>
+        </View>
+      </Modal>
+    );
+  }
+
+  return (
+    <BottomSheetModal
+      ref={ref}
+      snapPoints={['60%', '85%']}
+      enablePanDownToClose
+      backdropComponent={renderBackdrop}
+      onChange={handleChange}
+      handleIndicatorStyle={{ backgroundColor: '#D1D5DB' }}
+    >
+      <BottomSheetScrollView contentContainerStyle={{ padding: 0 }} showsVerticalScrollIndicator={false}>
+        {content}
       </BottomSheetScrollView>
     </BottomSheetModal>
   );
 }
+
+const styles = StyleSheet.create({
+  webOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  webCard: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    width: '100%',
+    maxWidth: 560,
+    overflow: 'hidden',
+  },
+});

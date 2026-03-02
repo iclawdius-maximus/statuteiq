@@ -1,6 +1,6 @@
 import { openai } from '../lib/openai';
 
-const MODEL = 'qwen2.5:7b';
+const MODEL = 'llama-3.3-70b-versatile';
 const TEXT_CAP = 2000;
 
 export async function generateCitation(statute: {

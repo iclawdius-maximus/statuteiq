@@ -1,8 +1,13 @@
 import OpenAI from 'openai';
+import { Platform } from 'react-native';
 
-// Uses Ollama's OpenAI-compatible endpoint — no API key needed, fully local
+const GROQ_API_KEY =
+  Platform.OS === 'web'
+    ? (process.env.EXPO_PUBLIC_GROQ_API_KEY ?? '')
+    : (process.env.EXPO_PUBLIC_GROQ_API_KEY ?? '');
+
 export const openai = new OpenAI({
-  baseURL: 'http://localhost:11434/v1',
-  apiKey: 'ollama',
+  baseURL: 'https://api.groq.com/openai/v1',
+  apiKey: GROQ_API_KEY || 'placeholder',
   dangerouslyAllowBrowser: true,
 });

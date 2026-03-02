@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 
 const UNLOCKED_KEY = 'statuteiq_unlocked';
 const PRODUCT_ID = 'com.vorotech.statuteiq.unlock';
@@ -6,6 +7,7 @@ const PRODUCT_ID = 'com.vorotech.statuteiq.unlock';
 let iapModule: typeof import('expo-in-app-purchases') | null = null;
 
 async function getIAP() {
+  if (Platform.OS === 'web') return null;
   if (!iapModule) {
     try {
       iapModule = await import('expo-in-app-purchases');
