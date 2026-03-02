@@ -1,6 +1,8 @@
 import OpenAI from 'openai';
 
+// Uses Ollama's OpenAI-compatible endpoint — no API key needed, fully local
 export const openai = new OpenAI({
-  apiKey: process.env.EXPO_PUBLIC_OPENAI_API_KEY ?? '',
+  baseURL: 'http://localhost:11434/v1',
+  apiKey: 'ollama',
   dangerouslyAllowBrowser: true,
 });

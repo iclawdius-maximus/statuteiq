@@ -1,6 +1,6 @@
 import { openai } from '../lib/openai';
 
-const MODEL = 'gpt-4o-mini';
+const MODEL = 'qwen2.5:7b';
 const TEXT_CAP = 2000;
 
 export async function generateCitation(statute: {
