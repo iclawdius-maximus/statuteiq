@@ -1,6 +1,12 @@
 import { useEffect, useState, useCallback } from 'react';
-import { FlatList, ActivityIndicator, RefreshControl } from 'react-native';
-import { View, Text, TouchableOpacity } from 'uniwind';
+import {
+  ActivityIndicator,
+  FlatList,
+  RefreshControl,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, Stack } from 'expo-router';
 import { getUserBookmarks, type Bookmark } from '../lib/bookmarks';

@@ -1,5 +1,10 @@
-import { Modal, ActivityIndicator } from 'react-native';
-import { View, Text, TouchableOpacity } from 'uniwind';
+import {
+  ActivityIndicator,
+  Modal,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { useState } from 'react';
 import { purchaseUnlock, restorePurchases } from '../lib/purchases';
 

@@ -1,14 +1,15 @@
 import { useEffect, useState } from 'react';
 import {
-  ScrollView,
-  TouchableOpacity,
-  ActivityIndicator,
-  Share,
-  ToastAndroid,
-  Platform,
+    ActivityIndicator,
   Alert,
+  Platform,
+  ScrollView,
+  Share,
+  Text,
+  ToastAndroid,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { View, Text } from 'uniwind';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';

@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
+    ActivityIndicator,
   FlatList,
+  Keyboard,
+  Text,
   TextInput,
   TouchableOpacity,
-  ActivityIndicator,
-  Keyboard,
+  View,
 } from 'react-native';
-import { View, Text } from 'uniwind';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { createClient } from '@supabase/supabase-js';

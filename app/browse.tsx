@@ -1,6 +1,11 @@
 import { useEffect, useState } from 'react';
-import { FlatList, ActivityIndicator } from 'react-native';
-import { View, Text, TouchableOpacity } from 'uniwind';
+import {
+  ActivityIndicator,
+  FlatList,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, Stack } from 'expo-router';
 import { supabase } from '../lib/supabase';
